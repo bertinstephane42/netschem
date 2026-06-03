@@ -1162,12 +1162,14 @@ function initZoom() {
 /* ============================================================
    CUSTOM MODE / TEMPLATE READ-ONLY
    ============================================================ */
-function switchToCustom(fromTemplate) {
+function switchToCustom(fromTemplate, forceBlank) {
   editorMode = 'custom';
   editor.setOption('readOnly', false);
   editor.getWrapperElement().classList.remove('template-mode');
   duplicateBtn.classList.remove('visible');
-  if (fromTemplate) {
+  if (forceBlank) {
+    editor.setValue('');
+  } else if (fromTemplate) {
     var code = editor.getValue();
     editor.setValue(code);
   } else {
@@ -1409,7 +1411,7 @@ function initTemplates() {
         showChoiceModal(
           'Souhaitez-vous modifier le schéma actuel ?\n« Oui » = dupliquer le template en mode édition\n« Non » = nouveau schéma vierge',
           function() { switchToCustom(true); showToast('Template dupliqué en mode édition', 'success'); },
-          function() { switchToCustom(false); showToast('Mode personnalisé activé', 'success'); }
+          function() { switchToCustom(false, true); showToast('Mode personnalisé activé', 'success'); }
         );
       } else {
         switchToCustom(false);
