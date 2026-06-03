@@ -1168,7 +1168,7 @@ function switchToCustom(fromTemplate, forceBlank) {
   editor.getWrapperElement().classList.remove('template-mode');
   duplicateBtn.classList.remove('visible');
   if (forceBlank) {
-    editor.setValue('');
+    editor.setValue(EMPTY_CUSTOM_CODE);
   } else if (fromTemplate) {
     var code = editor.getValue();
     editor.setValue(code);
@@ -1508,8 +1508,10 @@ document.addEventListener('DOMContentLoaded', function() {
     editor.setOption('readOnly', false);
     currentSchemaName = 'Personnalisé';
   } else {
+    editor.setValue(EMPTY_CUSTOM_CODE);
+    editorMode = 'custom';
     editor.setOption('readOnly', false);
-    currentSchemaName = 'Aucun';
+    currentSchemaName = 'Personnalisé';
   }
   updateSchemaBadge();
   renderDiagram();
