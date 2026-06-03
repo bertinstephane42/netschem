@@ -216,7 +216,7 @@ a{color:var(--primary)}
    PREVIEW PANEL
    ============================================================ */
 #preview-content{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:24px;background:var(--bg)}
-#mermaid-preview{width:100%;max-width:100%;display:flex;justify-content:center;transform-origin:top center;transition:transform 0.15s ease}
+#mermaid-preview{width:100%;max-width:100%;display:flex;justify-content:center;transform-origin:top left;transition:transform 0.15s ease}
 #mermaid-preview svg{max-width:100%;height:auto}
 #mermaid-preview .empty-state{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -298,6 +298,13 @@ a{color:var(--primary)}
   .toolbar-btn{padding:6px 8px}
   #template-select{min-width:110px;font-size:12px}
 }
+
+/* ============================================================
+   READ-ONLY & DUPLICATE
+   ============================================================ */
+.editor-wrap.template-mode .CodeMirror{opacity:.85}
+#btn-duplicate{display:none}
+#btn-duplicate.visible{display:inline-flex}
 
 /* ============================================================
    ZOOM CONTROLS
@@ -453,6 +460,10 @@ a{color:var(--primary)}
         <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </button>
       <button id="btn-help" class="toolbar-btn toolbar-btn-help" title="Aide syntaxe Mermaid" aria-label="Aide syntaxe Mermaid">?</button>
+      <button id="btn-duplicate" class="toolbar-btn" title="Dupliquer en mode édition" aria-label="Dupliquer le template">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span class="toolbar-btn-label">Dupliquer</span>
+      </button>
       <button id="btn-reset" class="toolbar-btn" title="Réinitialiser" aria-label="Réinitialiser">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       </button>
@@ -769,6 +780,9 @@ const TEMPLATES = [
     style PORTS fill:#0891b2,color:#fff`
   }
 ];
+var EMPTY_CUSTOM_CODE = `graph TB
+  %% Saisissez votre code ici
+  A[Début] --> B[Fin]`;
 
 /* ============================================================
    MERMAID CUSTOM MODE FOR CODEMIRROR
@@ -839,10 +853,12 @@ const divider = $('divider');
 const splitContainer = $('split-container');
 const editorPanel = $('editor-panel');
 const previewPanel = $('preview-panel');
+const duplicateBtn = $('btn-duplicate');
 
 let editor = null;
 let renderCount = 0;
 let renderTimer = null;
+let editorMode = 'custom';
 
 /* ============================================================
    HELPERS
@@ -870,6 +886,13 @@ function debounce(fn, delay) {
     clearTimeout(timer);
     timer = setTimeout(function() { fn.apply(ctx, args); }, delay);
   };
+}
+
+function getSavedCode() {
+  try {
+    var v = localStorage.getItem('netschem-code');
+    return (v && v.trim()) ? v : null;
+  } catch(_) { return null; }
 }
 
 function showToast(message, type) {
@@ -1113,6 +1136,37 @@ function initZoom() {
 }
 
 /* ============================================================
+   CUSTOM MODE / TEMPLATE READ-ONLY
+   ============================================================ */
+function switchToCustom(fromTemplate) {
+  editorMode = 'custom';
+  editor.setOption('readOnly', false);
+  editor.getWrapperElement().classList.remove('template-mode');
+  duplicateBtn.classList.remove('visible');
+  if (fromTemplate) {
+    var code = editor.getValue();
+    editor.setValue(code);
+  } else {
+    var saved = getSavedCode();
+    if (saved) {
+      editor.setValue(saved);
+    } else {
+      editor.setValue(EMPTY_CUSTOM_CODE);
+    }
+  }
+  renderDiagram();
+}
+
+function loadTemplateReadOnly(template) {
+  editorMode = 'template';
+  editor.setValue(template.code);
+  editor.setOption('readOnly', true);
+  editor.getWrapperElement().classList.add('template-mode');
+  duplicateBtn.classList.add('visible');
+  renderDiagram();
+}
+
+/* ============================================================
    HELP DRAWER
    ============================================================ */
 function openHelp() {
@@ -1295,6 +1349,16 @@ function initEditor() {
    TEMPLATES
    ============================================================ */
 function initTemplates() {
+  var customOpt = document.createElement('option');
+  customOpt.value = '__custom__';
+  customOpt.textContent = '✦ Schéma personnalisé';
+  templateSelect.appendChild(customOpt);
+
+  var sep = document.createElement('option');
+  sep.disabled = true;
+  sep.textContent = '──────────';
+  templateSelect.appendChild(sep);
+
   TEMPLATES.forEach(function(t) {
     var opt = document.createElement('option');
     opt.value = t.id;
@@ -1305,34 +1369,15 @@ function initTemplates() {
   templateSelect.addEventListener('change', function() {
     var id = this.value;
     if (!id) return;
-    var t = TEMPLATES.find(function(x) { return x.id === id; });
-    if (t) {
-      editor.setValue(t.code);
-      renderDiagram();
-      showToast('Template chargé : ' + t.name, 'success');
+    if (id === '__custom__') {
+      switchToCustom(false);
+      showToast('Mode personnalisé activé', 'success');
+    } else {
+      var t = TEMPLATES.find(function(x) { return x.id === id; });
+      if (t) loadTemplateReadOnly(t);
     }
     this.value = '';
   });
-}
-
-function loadDefaultTemplate() {
-  if (TEMPLATES.length > 0) {
-    editor.setValue(TEMPLATES[0].code);
-  }
-}
-
-/* ============================================================
-   PERSISTENCE
-   ============================================================ */
-function loadSavedContent() {
-  try {
-    var saved = localStorage.getItem('netschem-code');
-    if (saved && saved.trim()) {
-      editor.setValue(saved);
-      return true;
-    }
-  } catch(_) {}
-  return false;
 }
 
 /* ============================================================
@@ -1341,13 +1386,12 @@ function loadSavedContent() {
 function initReset() {
   resetBtn.addEventListener('click', function() {
     showModal(
-      'Êtes-vous sûr de vouloir réinitialiser ? Le code en cours sera perdu.',
+      'Réinitialiser votre schéma personnalisé ? Le code non sauvegardé sera perdu.',
       function() {
         try { localStorage.removeItem('netschem-code'); } catch(_) {}
-        loadDefaultTemplate();
-        renderDiagram();
+        switchToCustom(false);
         zoomReset();
-        showToast('Réinitialisation effectuée', 'success');
+        showToast('Schéma réinitialisé', 'success');
       }
     );
   });
@@ -1360,6 +1404,23 @@ function initExportButtons() {
   exportCodeBtn.addEventListener('click', exportCode);
   exportSvgBtn.addEventListener('click', exportSVG);
   exportPngBtn.addEventListener('click', exportPNG);
+}
+
+/* ============================================================
+   DUPLICATE
+   ============================================================ */
+function initDuplicate() {
+  duplicateBtn.addEventListener('click', function() {
+    showModal(
+      'Dupliquer ce template vers votre schéma personnalisé ? Vous pourrez le modifier librement.',
+      function() {
+        var code = editor.getValue();
+        try { localStorage.setItem('netschem-code', code); } catch(_) {}
+        switchToCustom(true);
+        showToast('Template dupliqué en mode édition', 'success');
+      }
+    );
+  });
 }
 
 /* ============================================================
@@ -1384,11 +1445,16 @@ document.addEventListener('DOMContentLoaded', function() {
   initReset();
   initZoom();
   initHelp();
+  initDuplicate();
 
-  if (!loadSavedContent()) {
-    loadDefaultTemplate();
+  var saved = getSavedCode();
+  if (saved) {
+    editor.setValue(saved);
+    editorMode = 'custom';
+    editor.setOption('readOnly', false);
+  } else {
+    switchToCustom(false);
   }
-
   renderDiagram();
 });
 </script>
