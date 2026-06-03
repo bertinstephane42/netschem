@@ -305,6 +305,9 @@ a{color:var(--primary)}
 .editor-wrap.template-mode .CodeMirror{opacity:.85}
 #btn-duplicate{display:none}
 #btn-duplicate.visible{display:inline-flex}
+.badge-schema{background:var(--text-dim);margin-left:4px;text-transform:none;letter-spacing:0;transition:var(--transition)}
+.badge-schema.custom{background:var(--success)}
+.badge-schema.template{background:var(--accent)}
 
 /* ============================================================
    ZOOM CONTROLS
@@ -474,7 +477,7 @@ a{color:var(--primary)}
   <main id="split-container" role="main">
     <section id="editor-panel" aria-label="Éditeur Mermaid">
       <div class="panel-header">
-        <span>Éditeur <span class="badge">Mermaid</span></span>
+        <span>Éditeur <span class="badge">Mermaid</span> <span id="schema-name-badge" class="badge badge-schema">Aucun</span></span>
       </div>
       <div class="editor-wrap">
         <textarea id="editor"></textarea>
@@ -859,6 +862,7 @@ let editor = null;
 let renderCount = 0;
 let renderTimer = null;
 let editorMode = 'custom';
+var currentSchemaName = 'Aucun';
 
 /* ============================================================
    HELPERS
@@ -908,8 +912,22 @@ function showToast(message, type) {
   }, 3000);
 }
 
+function showChoiceModal(message, onYes, onNo) {
+  modalMsg.textContent = message;
+  modalConfirm.textContent = 'Oui, dupliquer';
+  modalCancel.textContent = 'Non, vierge';
+  modalOverlay.hidden = false;
+  modalCancel.onclick = function() { modalOverlay.hidden = true; if (onNo) onNo(); };
+  modalConfirm.onclick = function() { modalOverlay.hidden = true; if (onYes) onYes(); };
+  modalOverlay.addEventListener('click', function(e) {
+    if (e.target === modalOverlay) { modalOverlay.hidden = true; if (onNo) onNo(); }
+  });
+}
+
 function showModal(message, callback) {
   modalMsg.textContent = message;
+  modalConfirm.textContent = 'Confirmer';
+  modalCancel.textContent = 'Annuler';
   modalOverlay.hidden = false;
   modalCancel.onclick = function() { modalOverlay.hidden = true; };
   modalConfirm.onclick = function() {
@@ -1068,6 +1086,12 @@ function initImport() {
     var reader = new FileReader();
     reader.onload = function(e) {
       editor.setValue(e.target.result);
+      editorMode = 'custom';
+      editor.setOption('readOnly', false);
+      editor.getWrapperElement().classList.remove('template-mode');
+      duplicateBtn.classList.remove('visible');
+      currentSchemaName = 'Personnalisé';
+      updateSchemaBadge();
       renderDiagram();
       showToast('Fichier importé : ' + file.name, 'success');
     };
@@ -1154,6 +1178,8 @@ function switchToCustom(fromTemplate) {
       editor.setValue(EMPTY_CUSTOM_CODE);
     }
   }
+  currentSchemaName = 'Personnalisé';
+  updateSchemaBadge();
   renderDiagram();
 }
 
@@ -1163,7 +1189,16 @@ function loadTemplateReadOnly(template) {
   editor.setOption('readOnly', true);
   editor.getWrapperElement().classList.add('template-mode');
   duplicateBtn.classList.add('visible');
+  currentSchemaName = template.name;
+  updateSchemaBadge();
   renderDiagram();
+}
+
+function updateSchemaBadge() {
+  var badge = document.getElementById('schema-name-badge');
+  if (!badge) return;
+  badge.textContent = currentSchemaName;
+  badge.className = 'badge badge-schema' + (editorMode === 'template' ? ' template' : ' custom');
 }
 
 /* ============================================================
@@ -1370,11 +1405,28 @@ function initTemplates() {
     var id = this.value;
     if (!id) return;
     if (id === '__custom__') {
-      switchToCustom(false);
-      showToast('Mode personnalisé activé', 'success');
+      if (editorMode === 'template') {
+        showChoiceModal(
+          'Souhaitez-vous modifier le schéma actuel ?\n« Oui » = dupliquer le template en mode édition\n« Non » = nouveau schéma vierge',
+          function() { switchToCustom(true); showToast('Template dupliqué en mode édition', 'success'); },
+          function() { switchToCustom(false); showToast('Mode personnalisé activé', 'success'); }
+        );
+      } else {
+        switchToCustom(false);
+        showToast('Mode personnalisé activé', 'success');
+      }
     } else {
       var t = TEMPLATES.find(function(x) { return x.id === id; });
-      if (t) loadTemplateReadOnly(t);
+      if (!t) { this.value = ''; return; }
+      var saved = getSavedCode();
+      if (saved && editorMode === 'custom') {
+        showModal(
+          'Votre schéma personnalisé en cours n\'a pas été exporté. Charger le template « ' + t.name + ' » écrasera votre travail. Confirmer ?',
+          function() { loadTemplateReadOnly(t); }
+        );
+      } else {
+        loadTemplateReadOnly(t);
+      }
     }
     this.value = '';
   });
@@ -1452,9 +1504,12 @@ document.addEventListener('DOMContentLoaded', function() {
     editor.setValue(saved);
     editorMode = 'custom';
     editor.setOption('readOnly', false);
+    currentSchemaName = 'Personnalisé';
   } else {
-    switchToCustom(false);
+    editor.setOption('readOnly', false);
+    currentSchemaName = 'Aucun';
   }
+  updateSchemaBadge();
   renderDiagram();
 });
 </script>
