@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetScheM — Architecture Diagram Designer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.5;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+button{cursor:pointer;font-family:inherit}
+select{font-family:inherit}
+a{color:var(--primary)}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+
+/* ============================================================
+   DESIGN SYSTEM
+   ============================================================ */
+:root{
+  --bg:#0b1120;
+  --surface:#1a2332;
+  --surface-2:#243044;
+  --text:#e2e8f0;
+  --text-muted:#94a3b8;
+  --text-dim:#64748b;
+  --primary:#3b82f6;
+  --primary-hover:#2563eb;
+  --accent:#6366f1;
+  --error:#ef4444;
+  --error-bg:rgba(239,68,68,0.12);
+  --success:#22c55e;
+  --success-bg:rgba(34,197,94,0.12);
+  --warning:#f59e0b;
+  --border:#2d3a4e;
+  --toolbar-bg:rgba(15,23,42,0.96);
+  --shadow:0 4px 24px rgba(0,0,0,0.4);
+  --radius:8px;
+  --radius-sm:6px;
+  --transition:0.2s cubic-bezier(0.4,0,0.2,1);
+  --font-sans:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+}
+[data-theme="light"]{
+  --bg:#f1f5f9;
+  --surface:#ffffff;
+  --surface-2:#f8fafc;
+  --text:#1e293b;
+  --text-muted:#64748b;
+  --text-dim:#94a3b8;
+  --primary:#2563eb;
+  --primary-hover:#1d4ed8;
+  --accent:#6366f1;
+  --error:#dc2626;
+  --error-bg:rgba(220,38,38,0.08);
+  --success:#16a34a;
+  --success-bg:rgba(22,163,74,0.08);
+  --warning:#d97706;
+  --border:#e2e8f0;
+  --toolbar-bg:rgba(255,255,255,0.96);
+  --shadow:0 4px 24px rgba(0,0,0,0.08);
+}
+
+/* ============================================================
+   SCROLLBARS
+   ============================================================ */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-dim)}
+
+/* ============================================================
+   APP LAYOUT
+   ============================================================ */
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* ===== Toolbar ===== */
+#toolbar{
+  display:flex;align-items:center;gap:8px;
+  padding:0 16px;height:52px;flex-shrink:0;
+  background:var(--toolbar-bg);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  z-index:100;
+}
+.toolbar-left{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.logo{font-size:18px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-sub{font-size:11px;color:var(--text-dim);font-weight:500;display:none}
+@media(min-width:900px){.logo-sub{display:inline}}
+.toolbar-center{display:flex;align-items:center;gap:8px;flex:1;justify-content:center}
+.toolbar-right{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.toolbar-divider{width:1px;height:28px;background:var(--border);flex-shrink:0;margin:0 4px}
+.btn-group{display:flex;align-items:center;gap:2px}
+.toolbar-btn,.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 12px;border:none;border-radius:var(--radius-sm);
+  font-size:13px;font-weight:500;color:var(--text);
+  background:transparent;transition:var(--transition);white-space:nowrap;
+}
+.toolbar-btn:hover,.btn:hover{background:var(--surface-2)}
+.toolbar-btn svg,.btn svg{width:16px;height:16px;flex-shrink:0}
+.toolbar-btn-label{display:none}
+@media(min-width:700px){.toolbar-btn-label{display:inline}}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-danger{background:var(--error);color:#fff}
+.btn-danger:hover{opacity:.9}
+
+/* Template select */
+.template-group{display:flex;align-items:center;gap:6px}
+.template-group label{font-size:12px;color:var(--text-muted);font-weight:500}
+#template-select{
+  padding:5px 28px 5px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--surface);color:var(--text);font-size:13px;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;cursor:pointer;
+  min-width:140px;transition:var(--transition);
+}
+#template-select:hover{border-color:var(--primary)}
+#template-select:focus-visible{border-color:var(--primary);outline:none}
+
+/* ===== Split Container ===== */
+#split-container{
+  display:flex;flex:1;overflow:hidden;position:relative;
+}
+#editor-panel{
+  display:flex;flex-direction:column;flex:0 0 50%;overflow:hidden;position:relative;
+}
+#preview-panel{
+  display:flex;flex-direction:column;flex:0 0 50%;overflow:hidden;position:relative;
+}
+.panel-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px;font-size:12px;font-weight:600;text-transform:uppercase;
+  letter-spacing:0.5px;color:var(--text-muted);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+  background:var(--surface);min-height:36px;
+}
+.panel-header .badge{
+  font-size:10px;padding:2px 8px;border-radius:10px;
+  background:var(--primary);color:#fff;text-transform:none;letter-spacing:0;
+}
+.status{font-size:11px;text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px}
+.status.loading{color:var(--warning)}
+.status.error{color:var(--error)}
+.status.ready{color:var(--success)}
+
+/* ===== Divider ===== */
+#divider{
+  flex:0 0 4px;background:var(--border);cursor:col-resize;
+  position:relative;z-index:10;transition:background 0.15s;
+}
+#divider:hover,#divider.active{background:var(--primary)}
+#divider::after{
+  content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:2px;height:32px;border-radius:2px;
+  background:var(--text-dim);opacity:.4;transition:var(--transition);
+}
+#divider:hover::after{opacity:.8;background:var(--primary)}
+
+/* ============================================================
+   CODE MIRROR
+   ============================================================ */
+.editor-wrap{flex:1;overflow:hidden;position:relative}
+.CodeMirror{
+  height:100% !important;font-family:var(--font-mono);font-size:14px;line-height:1.6;
+}
+
+/* netschem-dark theme */
+.cm-s-netschem-dark.CodeMirror{background:var(--surface);color:var(--text);border:none}
+.cm-s-netschem-dark .CodeMirror-gutters{background:var(--surface);border-right:1px solid var(--border)}
+.cm-s-netschem-dark .CodeMirror-linenumber{color:var(--text-dim);opacity:.5;font-size:12px}
+.cm-s-netschem-dark .CodeMirror-cursor{border-left:2px solid var(--primary)}
+.cm-s-netschem-dark .CodeMirror-selected{background:rgba(59,130,246,0.2)}
+.cm-s-netschem-dark .CodeMirror-activeline-background{background:rgba(255,255,255,0.03)}
+.cm-s-netschem-dark .cm-keyword{color:#a78bfa;font-weight:600}
+.cm-s-netschem-dark .cm-atom{color:#38bdf8}
+.cm-s-netschem-dark .cm-def{color:#e2e8f0}
+.cm-s-netschem-dark .cm-string{color:#4ade80}
+.cm-s-netschem-dark .cm-comment{color:#64748b;font-style:italic}
+.cm-s-netschem-dark .cm-link{color:#fb923c;font-weight:600}
+.cm-s-netschem-dark .cm-bracket{color:#f472b6}
+.cm-s-netschem-dark .cm-variable-2{color:#fbbf24}
+
+/* netschem-light theme */
+.cm-s-netschem-light.CodeMirror{background:var(--surface);color:var(--text);border:none}
+.cm-s-netschem-light .CodeMirror-gutters{background:var(--surface);border-right:1px solid var(--border)}
+.cm-s-netschem-light .CodeMirror-linenumber{color:var(--text-dim);opacity:.6;font-size:12px}
+.cm-s-netschem-light .CodeMirror-cursor{border-left:2px solid var(--primary)}
+.cm-s-netschem-light .CodeMirror-selected{background:rgba(37,99,235,0.12)}
+.cm-s-netschem-light .CodeMirror-activeline-background{background:rgba(0,0,0,0.02)}
+.cm-s-netschem-light .cm-keyword{color:#7c3aed;font-weight:600}
+.cm-s-netschem-light .cm-atom{color:#0284c7}
+.cm-s-netschem-light .cm-def{color:#1e293b}
+.cm-s-netschem-light .cm-string{color:#16a34a}
+.cm-s-netschem-light .cm-comment{color:#94a3b8;font-style:italic}
+.cm-s-netschem-light .cm-link{color:#ea580c;font-weight:600}
+.cm-s-netschem-light .cm-bracket{color:#db2777}
+.cm-s-netschem-light .cm-variable-2{color:#ca8a04}
+
+/* ============================================================
+   PREVIEW PANEL
+   ============================================================ */
+#preview-content{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:24px;background:var(--bg)}
+#mermaid-preview{width:100%;max-width:100%;display:flex;justify-content:center}
+#mermaid-preview svg{max-width:100%;height:auto}
+#mermaid-preview .empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:var(--text-dim);font-size:15px;padding:60px 20px;text-align:center;gap:8px;
+}
+#mermaid-preview .empty-state svg{width:48px;height:48px;opacity:.3}
+
+/* ============================================================
+   ERROR PANEL
+   ============================================================ */
+#error-panel{
+  flex-shrink:0;padding:12px 16px;background:var(--error-bg);
+  border-top:2px solid var(--error);font-size:13px;color:var(--error);overflow:auto;max-height:120px;
+}
+#error-panel strong{display:block;margin-bottom:4px;font-size:14px}
+#error-panel p{margin:0;font-family:var(--font-mono);font-size:12px;opacity:.9;white-space:pre-wrap;word-break:break-word}
+
+/* ============================================================
+   TOAST SYSTEM
+   ============================================================ */
+#toast-container{
+  position:fixed;bottom:24px;right:24px;z-index:9999;
+  display:flex;flex-direction:column;gap:8px;pointer-events:none;
+}
+.toast{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 20px;border-radius:var(--radius);
+  font-size:14px;font-weight:500;pointer-events:auto;
+  box-shadow:var(--shadow);animation:toastIn 0.3s ease;
+  max-width:360px;
+}
+.toast-success{background:#166534;color:#fff}
+.toast-error{background:#991b1b;color:#fff}
+.toast-loading{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+.toast-loading::before{
+  content:'';width:16px;height:16px;border:2px solid var(--border);
+  border-top-color:var(--primary);border-radius:50%;animation:spin 0.6s linear infinite;
+}
+@keyframes toastIn{from{opacity:0;transform:translateY(16px) scale(.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============================================================
+   MODAL OVERLAY
+   ============================================================ */
+#modal-overlay{
+  position:fixed;inset:0;z-index:9998;
+  background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+  animation:fadeIn 0.2s ease;
+}
+#modal-overlay[hidden]{display:none}
+#modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:28px 32px 24px;max-width:400px;width:90%;box-shadow:var(--shadow);
+  animation:modalIn 0.25s ease;
+}
+#modal p{font-size:15px;margin-bottom:20px;line-height:1.6;color:var(--text)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end}
+.modal-actions .btn{padding:8px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:600}
+.modal-actions .btn-secondary{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+.modal-actions .btn-secondary:hover{background:var(--border)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media(max-width:1023px){
+  #split-container{flex-direction:column}
+  #divider{display:none}
+  #editor-panel,#preview-panel{flex:0 0 50%!important;max-height:50%}
+  #toolbar{padding:0 8px;gap:4px;flex-wrap:wrap;height:auto;min-height:48px;padding:6px 8px}
+  .toolbar-center{order:3;flex:0 0 100%;justify-content:flex-start;margin-top:4px}
+  .template-group label{display:none}
+}
+@media(max-width:480px){
+  .btn-group{gap:0}
+  .toolbar-btn{padding:6px 8px}
+  #template-select{min-width:110px;font-size:12px}
+}
+
+/* ============================================================
+   PRINT
+   ============================================================ */
+@media print{
+  #toolbar,#editor-panel,#divider,#toast-container,#modal-overlay{display:none!important}
+  #preview-panel{flex:1!important}
+  #split-container{display:block}
+}
+
+/* ============================================================
+   PREFERS REDUCED MOTION
+   ============================================================ */
+@media(prefers-reduced-motion:reduce){
+  *,:before,:after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ===== Toolbar ===== -->
+  <header id="toolbar" role="toolbar" aria-label="Barre d'outils">
+    <div class="toolbar-left">
+      <span class="logo">NetScheM</span>
+      <span class="logo-sub">Architecture Diagram Designer</span>
+    </div>
+
+    <div class="toolbar-center">
+      <div class="btn-group">
+        <button id="btn-import" class="toolbar-btn" title="Importer un fichier .mmd" aria-label="Importer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="toolbar-btn-label">Import</span>
+        </button>
+        <button id="btn-export-code" class="toolbar-btn" title="Exporter le code .mmd" aria-label="Exporter le code">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span class="toolbar-btn-label">Code</span>
+        </button>
+        <button id="btn-export-svg" class="toolbar-btn" title="Exporter en SVG" aria-label="Exporter en SVG">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span class="toolbar-btn-label">SVG</span>
+        </button>
+        <button id="btn-export-png" class="toolbar-btn" title="Exporter en PNG haute résolution" aria-label="Exporter en PNG">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span class="toolbar-btn-label">PNG</span>
+        </button>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="template-group">
+        <label for="template-select">Template</label>
+        <select id="template-select" aria-label="Choisir un template d'architecture">
+          <option value="">Charger un template…</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="toolbar-right">
+      <button id="btn-theme" class="toolbar-btn" title="Changer le thème" aria-label="Changer le thème">
+        <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+      <button id="btn-reset" class="toolbar-btn" title="Réinitialiser" aria-label="Réinitialiser">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===== Main Split ===== -->
+  <main id="split-container" role="main">
+    <section id="editor-panel" aria-label="Éditeur Mermaid">
+      <div class="panel-header">
+        <span>Éditeur <span class="badge">Mermaid</span></span>
+      </div>
+      <div class="editor-wrap">
+        <textarea id="editor"></textarea>
+      </div>
+    </section>
+
+    <div id="divider" role="separator" tabindex="0" aria-label="Redimensionner les panneaux" aria-orientation="vertical"></div>
+
+    <section id="preview-panel" aria-label="Aperçu du diagramme">
+      <div class="panel-header">
+        <span>Aperçu <span id="diagram-status" class="status"></span></span>
+      </div>
+      <div id="preview-content">
+        <div id="mermaid-preview">
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span>Votre diagramme apparaîtra ici</span>
+          </div>
+        </div>
+      </div>
+      <div id="error-panel" hidden>
+        <strong>Erreur</strong>
+        <p id="error-message"></p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== Toast Container ===== -->
+<div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ===== Modal ===== -->
+<div id="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div id="modal">
+    <p id="modal-message">Êtes-vous sûr ?</p>
+    <div class="modal-actions">
+      <button id="modal-cancel" class="btn btn-secondary">Annuler</button>
+      <button id="modal-confirm" class="btn btn-danger">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Hidden File Input ===== -->
+<input type="file" id="file-input" accept=".mmd,.txt,.mermaid" hidden>
+
+<script>
+/* ============================================================
+   TEMPLATES
+   ============================================================ */
+const TEMPLATES = [
+  {
+    id: '3tiers',
+    name: 'Architecture 3-Tiers',
+    desc: 'Isolation des couches Présentation / Métier / Données',
+    code: `graph TB
+    subgraph "Couche Présentation"
+        UI[Application Web]
+        Mobile[Application Mobile]
+    end
+    subgraph "Couche Métier"
+        API[API Gateway]
+        LOGIC[Microservices Métier]
+        AUTH[Authentification \& Autorisation]
+    end
+    subgraph "Couche Données"
+        DB[(Base de Données Relationnelle)]
+        CACHE[(Cache Redis)]
+        FS[Stockage Fichiers / S3]
+    end
+    UI --> API
+    Mobile --> API
+    API --> AUTH
+    AUTH --> LOGIC
+    LOGIC --> DB
+    LOGIC --> CACHE
+    LOGIC --> FS`
+  },
+  {
+    id: 'microservices',
+    name: 'Microservices Sécurisés',
+    desc: 'API Gateway, JWT, Rate Limiter, services isolés',
+    code: `graph LR
+    Client[Client] -->|HTTPS| LB[Load Balancer]
+    LB --> GW[API Gateway]
+    GW --> AUTH[Service Auth JWT]
+    GW --> RL[Rate Limiter \& WAF]
+    GW --> S1[Service Utilisateurs]
+    GW --> S2[Service Commandes]
+    GW --> S3[Service Paiements]
+    subgraph "Sécurité"
+        AUTH --> IDP[Identity Provider]
+        RL --> THR[Seuils \& Alertes]
+    end
+    subgraph "Persistance"
+        S1 --> DB1[(DB Utilisateurs)]
+        S2 --> DB2[(DB Commandes)]
+        S3 --> DB3[(DB Paiements)]
+        S3 --> PSP[Passerelle Paiement]
+    end
+    style Client fill:#1e40af,color:#fff
+    style LB fill:#0d9488,color:#fff
+    style GW fill:#7c3aed,color:#fff`
+  },
+  {
+    id: 'tls',
+    name: 'Flux TLS Chiffré',
+    desc: 'Chiffrement de bout en bout, du client au stockage',
+    code: `graph LR
+    Client[Client Navigateur] -->|TLS 1.3| CDN[CDN / Reverse Proxy]
+    CDN -->|TLS 1.3| WAF[WAF / Pare-feu Applicatif]
+    WAF -->|TLS 1.3| LB[Load Balancer Interne]
+    LB -->|mTLS| APP[Servers Applicatifs]
+    APP -->|TLS 1.3| DB[(Base de Données)]
+    APP -->|TLS 1.3 avec Auth| CACHE[(Redis Cache)]
+    APP -->|TLS 1.3| FS[Object Storage Chiffré]
+    subgraph "Chiffrement"
+        TS[Trust Store / PKI]
+        CERT[Gestion des Certificats]
+        HSM[Hardware Security Module]
+    end
+    TS --> CDN
+    TS --> APP
+    HSM --> CERT
+    APP --> HSM
+    style Client fill:#1e40af,color:#fff
+    style DB fill:#166534,color:#fff
+    style HSM fill:#991b1b,color:#fff`
+  },
+  {
+    id: 'zerotrust',
+    name: 'Architecture Zero Trust',
+    desc: 'Never trust, always verify — segmentation et contrôle strict',
+    code: `graph TB
+    subgraph "Internet / Non Fiables"
+        USER[Utilisateur]
+        DEV[Appareil / Endpoint]
+    end
+    subgraph "Plan de Contrôle Zero Trust"
+        PDP[Policy Decision Point]
+        PEP[Policy Enforcement Point]
+        IAM[IAM \& MFA]
+        SRC[Vérification Source]
+        DEV_CHECK[Conformité Appareil]
+        SESSION[Session Dynamic]
+    end
+    subgraph "Ressources Protégées"
+        APP1[Application Métier]
+        DATA[Données Sensibles]
+        API[API Interne]
+    end
+    subgraph "Observabilité"
+        LOG[Logs \& Audit]
+        BEHAV[Analyse Comportementale]
+        ALERT[Alertes Temps Réel]
+    end
+    USER --> PEP
+    DEV --> PEP
+    PEP --> PDP
+    PDP --> IAM
+    PDP --> SRC
+    PDP --> DEV_CHECK
+    PEP --> APP1
+    APP1 --> API
+    API --> DATA
+    PEP --> LOG
+    LOG --> BEHAV
+    BEHAV --> ALERT`
+  },
+  {
+    id: 'cicd',
+    name: 'Pipeline CI/CD Sécurisé',
+    desc: 'Intégration et déploiement continus avec sécurité intégrée',
+    code: `graph LR
+    DEV[Développeur] -->|git push| GIT[Dépôt Git]
+    GIT --> BUILD[Build \& Compilation]
+    BUILD --> UT[Tests Unitaires]
+    UT -->     IT[Tests d'Intégration]
+    IT --> SAST[SAST - Analyse Statique]
+    SAST --> SECRETS[Détection de Secrets]
+    SECRETS --> SCA[SCA - Analyse Dépendances]
+    SCA --> SBOM[Génération SBOM]
+    SBOM --> BUILD_IMG[Build Image Container]
+    BUILD_IMG --> SIGN[Signature de l\\'Image]
+    SIGN --> SCAN[Scan de Vulnérabilités]
+    SCAN --> REGISTRY[Registry Container]
+    REGISTRY --> DEPLOY[Déploiement Production]
+    style DEV fill:#2563eb,color:#fff
+    style GIT fill:#64748b,color:#fff
+    style BUILD fill:#0891b2,color:#fff
+    style SAST fill:#dc2626,color:#fff
+    style SECRETS fill:#dc2626,color:#fff
+    style SBOM fill:#ca8a04,color:#fff
+    style SIGN fill:#7c3aed,color:#fff
+    style DEPLOY fill:#16a34a,color:#fff`
+  },
+  {
+    id: 'hexagonal',
+    name: 'Architecture Hexagonale',
+    desc: 'Ports / Adapters — domaine métier isolé des infrastructures',
+    code: `graph TB
+    subgraph "Domaine (Core)"
+        ENT[Entités / Value Objects]
+        UC[Use Cases / Services]
+        PORTS[Ports / Interfaces]
+    end
+    subgraph "Adapters Primaires (Driven)"
+        WEB[Contrôleur Web]
+        CLI[Interface CLI]
+        API[API REST / GraphQL]
+        EVT[Event Consumer]
+    end
+    subgraph "Adapters Secondaires (Driven)"
+        DB[(Database Adapter)]
+        MQ[Message Queue Adapter]
+        EXT[API Externe Adapter]
+        CACHE[Cache Adapter]
+    end
+    WEB --> UC
+    CLI --> UC
+    API --> UC
+    EVT --> UC
+    UC --> ENT
+    UC --> PORTS
+    PORTS --> DB
+    UC --> PORTS
+    PORTS --> MQ
+    PORTS --> EXT
+    PORTS --> CACHE
+    style ENT fill:#7c3aed,color:#fff
+    style UC fill:#7c3aed,color:#fff
+    style PORTS fill:#0891b2,color:#fff`
+  }
+];
+
+/* ============================================================
+   MERMAID CUSTOM MODE FOR CODEMIRROR
+   ============================================================ */
+CodeMirror.defineMode('mermaid', function() {
+  return {
+    startState: function() { return {}; },
+    token: function(stream) {
+      if (stream.eatSpace()) return null;
+      var ch = stream.next();
+      if (ch === '%' && stream.peek() === '%') {
+        stream.skipToEnd();
+        return 'comment';
+      }
+      if (/[a-zA-Z_]/.test(ch)) {
+        stream.eatWhile(/[\w]/);
+        var word = stream.current();
+        if (/^(graph|subgraph|end|direction|classDef|linkStyle|click)$/i.test(word)) return 'keyword';
+        if (/^(TB|BT|LR|RL|TD)$/i.test(word)) return 'atom';
+        return 'def';
+      }
+      if (ch === '-' || ch === '=' || ch === '.') {
+        if (ch === '-' && stream.match(/->/)) return 'link';
+        if (ch === '-' && stream.match(/\.->/)) return 'link';
+        if (ch === '-' && stream.match(/[xo]/)) return 'link';
+        if (ch === '-' && stream.match(/--/)) return 'link';
+        if (ch === '=' && stream.match(/=>/)) return 'link';
+        if (ch === '=' && stream.match(/=[xo]/)) return 'link';
+        if (ch === '=' && stream.match(/==/)) return 'link';
+        if (ch === '.' && stream.match(/->/)) return 'link';
+        return null;
+      }
+      if (ch === '"') {
+        stream.eatWhile(/[^"]/); stream.next();
+        return 'string';
+      }
+      if ('[](){}<>'.indexOf(ch) !== -1) return 'bracket';
+      return null;
+    }
+  };
+});
+
+/* ============================================================
+   DOM REFS
+   ============================================================ */
+const $ = function(id) { return document.getElementById(id); };
+const editorEl = $('editor');
+const previewEl = $('mermaid-preview');
+const previewContent = $('preview-content');
+const errorPanel = $('error-panel');
+const errorMsg = $('error-message');
+const statusEl = $('diagram-status');
+const toastContainer = $('toast-container');
+const modalOverlay = $('modal-overlay');
+const modalMsg = $('modal-message');
+const modalCancel = $('modal-cancel');
+const modalConfirm = $('modal-confirm');
+const templateSelect = $('template-select');
+const themeBtn = $('btn-theme');
+const themeIcon = $('theme-icon');
+const resetBtn = $('btn-reset');
+const importBtn = $('btn-import');
+const exportCodeBtn = $('btn-export-code');
+const exportSvgBtn = $('btn-export-svg');
+const exportPngBtn = $('btn-export-png');
+const fileInput = $('file-input');
+const divider = $('divider');
+const splitContainer = $('split-container');
+const editorPanel = $('editor-panel');
+const previewPanel = $('preview-panel');
+
+let editor = null;
+let renderCount = 0;
+let renderTimer = null;
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function downloadBlob(blob, filename) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+}
+
+function debounce(fn, delay) {
+  var timer = null;
+  return function() {
+    var ctx = this, args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function() { fn.apply(ctx, args); }, delay);
+  };
+}
+
+function showToast(message, type) {
+  var toast = document.createElement('div');
+  toast.className = 'toast toast-' + type;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(function() {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    toast.style.transition = '0.3s ease';
+    setTimeout(function() { toast.remove(); }, 300);
+  }, 3000);
+}
+
+function showModal(message, callback) {
+  modalMsg.textContent = message;
+  modalOverlay.hidden = false;
+  modalCancel.onclick = function() { modalOverlay.hidden = true; };
+  modalConfirm.onclick = function() {
+    modalOverlay.hidden = true;
+    callback();
+  };
+  modalOverlay.addEventListener('click', function(e) {
+    if (e.target === modalOverlay) modalOverlay.hidden = true;
+  });
+}
+
+/* ============================================================
+   MERMAID RENDER
+   ============================================================ */
+async function renderDiagram() {
+  var code = editor.getValue();
+  try {
+    localStorage.setItem('netschem-code', code);
+  } catch(_) {}
+
+  errorPanel.hidden = true;
+
+  if (!code.trim()) {
+    previewEl.innerHTML =
+      '<div class="empty-state">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' +
+      '<span>Votre diagramme apparaîtra ici</span></div>';
+    statusEl.textContent = '';
+    statusEl.className = 'status';
+    return;
+  }
+
+  statusEl.textContent = 'Rendu…';
+  statusEl.className = 'status loading';
+
+  var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: isDark ? 'dark' : 'default',
+    securityLevel: 'loose',
+    fontFamily: 'Inter, system-ui, sans-serif',
+    themeVariables: isDark ? {
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#64748b',
+      secondaryColor: '#1a2332',
+      tertiaryColor: '#243044',
+      clusterBkg: '#0f172a',
+      clusterBorder: '#2d3a4e',
+      nodeBorder: '#3b82f6',
+      nodeTextColor: '#e2e8f0'
+    } : {
+      primaryColor: '#dbeafe',
+      primaryTextColor: '#1e293b',
+      primaryBorderColor: '#2563eb',
+      lineColor: '#94a3b8',
+      secondaryColor: '#f8fafc',
+      tertiaryColor: '#f1f5f9',
+      clusterBkg: '#f1f5f9',
+      clusterBorder: '#e2e8f0',
+      nodeBorder: '#2563eb',
+      nodeTextColor: '#1e293b'
+    }
+  });
+
+  try {
+    var id = 'mermaid-' + (renderCount++);
+    var result = await mermaid.render(id, code);
+    previewEl.innerHTML = result.svg;
+    statusEl.textContent = 'Prêt';
+    statusEl.className = 'status ready';
+  } catch(err) {
+    previewEl.innerHTML = '';
+    errorPanel.hidden = false;
+    errorMsg.textContent = err.message || String(err);
+    statusEl.textContent = 'Erreur';
+    statusEl.className = 'status error';
+  }
+}
+
+var autoRender = debounce(renderDiagram, 400);
+
+/* ============================================================
+   EXPORT FUNCTIONS
+   ============================================================ */
+function getSvgElement() {
+  return previewEl.querySelector('svg');
+}
+
+function exportCode() {
+  var code = editor.getValue();
+  if (!code.trim()) { showToast('Aucun code à exporter', 'error'); return; }
+  var blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+  downloadBlob(blob, 'diagram.mmd');
+  showToast('Code source exporté', 'success');
+}
+
+function exportSVG() {
+  var svg = getSvgElement();
+  if (!svg) { showToast('Aucun diagramme à exporter', 'error'); return; }
+  var serializer = new XMLSerializer();
+  var svgStr = serializer.serializeToString(svg);
+  var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+  downloadBlob(blob, 'diagram.svg');
+  showToast('SVG exporté avec succès', 'success');
+}
+
+function exportPNG() {
+  var svg = getSvgElement();
+  if (!svg) { showToast('Aucun diagramme à exporter', 'error'); return; }
+
+  var loadingToast = document.createElement('div');
+  loadingToast.className = 'toast toast-loading';
+  loadingToast.textContent = 'Génération du PNG…';
+  toastContainer.appendChild(loadingToast);
+
+  var serializer = new XMLSerializer();
+  var svgStr = serializer.serializeToString(svg);
+  var svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+  var url = URL.createObjectURL(svgBlob);
+
+  var img = new Image();
+  img.onload = function() {
+    loadingToast.remove();
+    var scale = 2;
+    var canvas = document.createElement('canvas');
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(function(blob) {
+      downloadBlob(blob, 'diagram.png');
+      showToast('PNG exporté avec succès', 'success');
+    }, 'image/png');
+  };
+  img.onerror = function() {
+    loadingToast.remove();
+    URL.revokeObjectURL(url);
+    showToast('Erreur lors de la génération du PNG', 'error');
+  };
+  img.src = url;
+}
+
+/* ============================================================
+   IMPORT
+   ============================================================ */
+function initImport() {
+  importBtn.addEventListener('click', function() { fileInput.click(); });
+  fileInput.addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      editor.setValue(e.target.result);
+      renderDiagram();
+      showToast('Fichier importé : ' + file.name, 'success');
+    };
+    reader.onerror = function() {
+      showToast('Erreur lors de la lecture du fichier', 'error');
+    };
+    reader.readAsText(file);
+    fileInput.value = '';
+  });
+}
+
+/* ============================================================
+   THEME
+   ============================================================ */
+function updateThemeIcon(isDark) {
+  if (isDark) {
+    themeIcon.innerHTML =
+      '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>' +
+      '<line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>' +
+      '<line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>' +
+      '<line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+  } else {
+    themeIcon.innerHTML =
+      '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  }
+}
+
+function switchTheme() {
+  var html = document.documentElement;
+  var current = html.getAttribute('data-theme') || 'dark';
+  var next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  editor.setOption('theme', next === 'dark' ? 'netschem-dark' : 'netschem-light');
+  localStorage.setItem('netschem-theme', next);
+  updateThemeIcon(next === 'dark');
+  renderDiagram();
+}
+
+function initTheme() {
+  var saved = localStorage.getItem('netschem-theme');
+  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var theme = saved || (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
+  updateThemeIcon(theme === 'dark');
+  themeBtn.addEventListener('click', switchTheme);
+}
+
+/* ============================================================
+   SPLIT PANE
+   ============================================================ */
+function initSplitPane() {
+  var isDragging = false;
+  var startX, startLeft;
+
+  divider.addEventListener('mousedown', function(e) {
+    isDragging = true;
+    startX = e.clientX;
+    startLeft = editorPanel.getBoundingClientRect().width;
+    divider.classList.add('active');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!isDragging) return;
+    var containerRect = splitContainer.getBoundingClientRect();
+    var dx = e.clientX - startX;
+    var pct = ((startLeft + dx) / containerRect.width) * 100;
+    pct = Math.max(25, Math.min(75, pct));
+    editorPanel.style.flex = '0 0 ' + pct + '%';
+    previewPanel.style.flex = '0 0 ' + (100 - pct) + '%';
+    if (editor) editor.refresh();
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (isDragging) {
+      isDragging = false;
+      divider.classList.remove('active');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      if (editor) editor.refresh();
+    }
+  });
+
+  divider.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      var containerRect = splitContainer.getBoundingClientRect();
+      var currentPct = (editorPanel.getBoundingClientRect().width / containerRect.width) * 100;
+      var delta = e.key === 'ArrowLeft' ? -5 : 5;
+      var pct = Math.max(25, Math.min(75, currentPct + delta));
+      editorPanel.style.flex = '0 0 ' + pct + '%';
+      previewPanel.style.flex = '0 0 ' + (100 - pct) + '%';
+      if (editor) editor.refresh();
+    }
+  });
+}
+
+/* ============================================================
+   EDITOR INIT
+   ============================================================ */
+function initEditor() {
+  var initialTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+  editor = CodeMirror.fromTextArea(editorEl, {
+    mode: 'mermaid',
+    theme: initialTheme === 'dark' ? 'netschem-dark' : 'netschem-light',
+    lineNumbers: true,
+    lineWrapping: true,
+    matchBrackets: true,
+    indentUnit: 4,
+    tabSize: 4,
+    indentWithTabs: false,
+    viewportMargin: Infinity,
+    extraKeys: {
+      'Tab': function(cm) {
+        cm.replaceSelection('    ', 'end');
+      },
+      'Ctrl-S': function() {
+        renderDiagram();
+      },
+      'Cmd-S': function() {
+        renderDiagram();
+      }
+    }
+  });
+
+  editor.on('change', autoRender);
+}
+
+/* ============================================================
+   TEMPLATES
+   ============================================================ */
+function initTemplates() {
+  TEMPLATES.forEach(function(t) {
+    var opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    templateSelect.appendChild(opt);
+  });
+
+  templateSelect.addEventListener('change', function() {
+    var id = this.value;
+    if (!id) return;
+    var t = TEMPLATES.find(function(x) { return x.id === id; });
+    if (t) {
+      editor.setValue(t.code);
+      renderDiagram();
+      showToast('Template chargé : ' + t.name, 'success');
+    }
+    this.value = '';
+  });
+}
+
+function loadDefaultTemplate() {
+  if (TEMPLATES.length > 0) {
+    editor.setValue(TEMPLATES[0].code);
+  }
+}
+
+/* ============================================================
+   PERSISTENCE
+   ============================================================ */
+function loadSavedContent() {
+  try {
+    var saved = localStorage.getItem('netschem-code');
+    if (saved && saved.trim()) {
+      editor.setValue(saved);
+      return true;
+    }
+  } catch(_) {}
+  return false;
+}
+
+/* ============================================================
+   RESET
+   ============================================================ */
+function initReset() {
+  resetBtn.addEventListener('click', function() {
+    showModal(
+      'Êtes-vous sûr de vouloir réinitialiser ? Le code en cours sera perdu.',
+      function() {
+        try { localStorage.removeItem('netschem-code'); } catch(_) {}
+        loadDefaultTemplate();
+        renderDiagram();
+        showToast('Réinitialisation effectuée', 'success');
+      }
+    );
+  });
+}
+
+/* ============================================================
+   EXPORT BUTTONS
+   ============================================================ */
+function initExportButtons() {
+  exportCodeBtn.addEventListener('click', exportCode);
+  exportSvgBtn.addEventListener('click', exportSVG);
+  exportPngBtn.addEventListener('click', exportPNG);
+}
+
+/* ============================================================
+   KEYBOARD SHORTCUTS (global)
+   ============================================================ */
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && !modalOverlay.hidden) {
+    modalOverlay.hidden = true;
+  }
+});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+document.addEventListener('DOMContentLoaded', function() {
+  initTheme();
+  initEditor();
+  initTemplates();
+  initSplitPane();
+  initImport();
+  initExportButtons();
+  initReset();
+
+  if (!loadSavedContent()) {
+    loadDefaultTemplate();
+  }
+
+  renderDiagram();
+});
+</script>
+</body>
+</html>
