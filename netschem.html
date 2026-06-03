@@ -1246,7 +1246,7 @@ function initHelp() {
 
   document.querySelectorAll('.insert-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var snippet = this.getAttribute('data-snippet');
+      var snippet = this.getAttribute('data-snippet').replace(/\\n/g, '\n');
       if (!snippet) return;
       var doc = editor.getDoc();
       var cursor = doc.getCursor();
