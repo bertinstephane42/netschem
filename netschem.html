@@ -1085,15 +1085,21 @@ function initImport() {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function(e) {
-      editor.setValue(e.target.result);
-      editorMode = 'custom';
-      editor.setOption('readOnly', false);
-      editor.getWrapperElement().classList.remove('template-mode');
-      duplicateBtn.classList.remove('visible');
-      currentSchemaName = 'Personnalisé';
-      updateSchemaBadge();
-      renderDiagram();
-      showToast('Fichier importé : ' + file.name, 'success');
+      var content = e.target.result;
+      showModal(
+        'Importer le fichier « ' + file.name + ' » ? Le contenu actuel sera remplacé.',
+        function() {
+          editor.setValue(content);
+          editorMode = 'custom';
+          editor.setOption('readOnly', false);
+          editor.getWrapperElement().classList.remove('template-mode');
+          duplicateBtn.classList.remove('visible');
+          currentSchemaName = 'Personnalisé';
+          updateSchemaBadge();
+          renderDiagram();
+          showToast('Fichier importé : ' + file.name, 'success');
+        }
+      );
     };
     reader.onerror = function() {
       showToast('Erreur lors de la lecture du fichier', 'error');
@@ -1455,9 +1461,15 @@ function initReset() {
    EXPORT BUTTONS
    ============================================================ */
 function initExportButtons() {
-  exportCodeBtn.addEventListener('click', exportCode);
-  exportSvgBtn.addEventListener('click', exportSVG);
-  exportPngBtn.addEventListener('click', exportPNG);
+  exportCodeBtn.addEventListener('click', function() {
+    showModal('Exporter le code source (.mmd) ?', exportCode);
+  });
+  exportSvgBtn.addEventListener('click', function() {
+    showModal('Exporter le diagramme au format SVG ?', exportSVG);
+  });
+  exportPngBtn.addEventListener('click', function() {
+    showModal('Exporter le diagramme au format PNG ?', exportPNG);
+  });
 }
 
 /* ============================================================
